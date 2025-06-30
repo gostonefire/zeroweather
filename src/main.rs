@@ -2,7 +2,7 @@ use std::thread;
 use std::time::Duration;
 use log::{error, info};
 use crate::errors::UnrecoverableError;
-use crate::initialization::{config, SensorW1};
+use crate::initialization::config;
 use crate::manager_logger::WeatherLogger;
 use crate::manager_w1::W1Therm;
 
