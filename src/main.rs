@@ -16,7 +16,7 @@ fn main() -> Result<(), UnrecoverableError> {
     let config = config()?;
     let mut w1_sensors: Vec<W1Therm> = Vec::new();
     for s in config.sensor_w1.thermometer.iter() {
-        w1_sensors.push(W1Therm::new(&s.0, &s.1, s.2))
+        w1_sensors.push(W1Therm::new(&s.0, &s.1, s.2, s.3))
     }
 
     let mut weather_logger = WeatherLogger::new(&config.weatherlogger.url);

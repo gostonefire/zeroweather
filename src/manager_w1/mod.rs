@@ -10,6 +10,7 @@ pub struct W1Therm<'a> {
     name: &'a str,
     path: &'a str,
     ma: usize,
+    threshold: f64,
     readings: VecDeque<f64>,
     last_reading: f64,
     last_report: Instant,
@@ -24,11 +25,13 @@ impl<'a> W1Therm<'a> {
     /// * 'name' - the name of the sensor
     /// * 'path' - the path to the bus file carrying (and triggering) the measurement
     /// * 'ma' - moving average history (zero or one means no moving average)
-    pub fn new(name: &'a str, path: &'a str, ma: usize) -> W1Therm<'a> {
+    /// * 'threshold' - threshold before change in temperature is reported
+    pub fn new(name: &'a str, path: &'a str, ma: usize, threshold: f64) -> W1Therm<'a> {
         W1Therm { 
             name, 
             path, 
-            ma: if ma == 0 { 1 } else { ma }, 
+            ma: if ma == 0 { 1 } else { ma },
+            threshold,
             readings: VecDeque::new(), 
             last_reading: 0.0, 
             last_report: Instant::now() 
@@ -44,9 +47,8 @@ impl<'a> W1Therm<'a> {
             return Err(format!("corrupt w1 file: {}", data).into());
         };
 
-        let temp = data[t_pos + 2..].trim().to_string().parse::<f64>()?;
-        let rounded = (temp / 100.0).round() / 10.0;
-        let avg = self.moving_average(rounded);
+        let temp = data[t_pos + 2..].trim().to_string().parse::<f64>()? / 1000.0;
+        let avg = self.moving_average(to_one_decimal(temp));
 
         Ok((self.name, self.report(avg)))
     }
@@ -73,13 +75,16 @@ impl<'a> W1Therm<'a> {
             self.readings.pop_front();
         }
         
-        Some(self.readings.iter().sum::<f64>() / self.ma as f64)
+        let avg = to_one_decimal(self.readings.iter().sum::<f64>() / self.ma as f64);
+        
+        Some(avg)
     }
     
     /// Checks if a report shall be done and returns an option accordingly.
     /// 
     /// The policy is to report at least every 5 minute (300 secs) or
-    /// whenever the last reading differs from previously reported one.
+    /// whenever the last reading differs from previously reported one by 
+    /// at least `self.threshold`.
     /// 
     /// # Arguments
     /// 
@@ -87,7 +92,7 @@ impl<'a> W1Therm<'a> {
     fn report(&mut self, temp: Option<f64>) -> Option<f64> {
         let Some(temp) = temp else { return None };
         
-        if self.last_report.elapsed().as_secs() >= 300 || self.last_reading != temp {
+        if self.last_report.elapsed().as_secs() >= 300 || (self.last_reading - temp).abs() >= self.threshold {
             self.last_report = Instant::now();
             self.last_reading = temp;
             
@@ -96,4 +101,13 @@ impl<'a> W1Therm<'a> {
             None
         }
     }
+}
+
+/// Rounds the given value to one decimal
+/// 
+/// # Arguments
+/// 
+/// * 'input' - value to round
+fn to_one_decimal(input: f64) -> f64 {
+    (input * 10.0).round() / 10.0
 }
