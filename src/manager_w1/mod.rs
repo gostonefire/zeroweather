@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::time::Instant;
 use crate::manager_w1::errors::W1Error;
 
@@ -8,6 +9,8 @@ mod errors;
 pub struct W1Therm<'a> {
     name: &'a str,
     path: &'a str,
+    ma: usize,
+    readings: VecDeque<f64>,
     last_reading: f64,
     last_report: Instant,
 }
@@ -20,8 +23,16 @@ impl<'a> W1Therm<'a> {
     ///
     /// * 'name' - the name of the sensor
     /// * 'path' - the path to the bus file carrying (and triggering) the measurement
-    pub fn new(name: &'a str, path: &'a str) -> W1Therm<'a> {
-        W1Therm { name, path, last_reading: 0.0, last_report: Instant::now() }
+    /// * 'ma' - moving average history (zero or one means no moving average)
+    pub fn new(name: &'a str, path: &'a str, ma: usize) -> W1Therm<'a> {
+        W1Therm { 
+            name, 
+            path, 
+            ma: if ma == 0 { 1 } else { ma }, 
+            readings: VecDeque::new(), 
+            last_reading: 0.0, 
+            last_report: Instant::now() 
+        }
     }
 
     /// Performs a reading from the 1-wire interface and returns a temperature rounded
@@ -34,8 +45,10 @@ impl<'a> W1Therm<'a> {
         };
 
         let temp = data[t_pos + 2..].trim().to_string().parse::<f64>()?;
+        let rounded = (temp / 100.0).round() / 10.0;
+        let avg = self.moving_average(rounded);
 
-        Ok((self.name, self.report((temp / 100.0).round() / 10.0)))
+        Ok((self.name, self.report(avg)))
     }
     
     /// Returns the sensor name
@@ -44,6 +57,25 @@ impl<'a> W1Therm<'a> {
         self.name
     }
 
+    /// Calculates the moving average over the last `self.ma` readings
+    /// 
+    /// # Arguments
+    /// 
+    /// * 'temp' - temperature reading
+    fn moving_average(&mut self, temp: f64) -> Option<f64> {
+        self.readings.push_back(temp);
+        
+        if self.readings.len() < self.ma {
+            return None;    
+        }
+        
+        if self.readings.len() > self.ma {
+            self.readings.pop_front();
+        }
+        
+        Some(self.readings.iter().sum::<f64>() / self.ma as f64)
+    }
+    
     /// Checks if a report shall be done and returns an option accordingly.
     /// 
     /// The policy is to report at least every 5 minute (300 secs) or
@@ -52,8 +84,9 @@ impl<'a> W1Therm<'a> {
     /// # Arguments
     /// 
     /// * 'temp' - temperature reading to evaluate
-    fn report(&mut self, temp: f64) -> Option<f64> {
-
+    fn report(&mut self, temp: Option<f64>) -> Option<f64> {
+        let Some(temp) = temp else { return None };
+        
         if self.last_report.elapsed().as_secs() >= 300 || self.last_reading != temp {
             self.last_report = Instant::now();
             self.last_reading = temp;

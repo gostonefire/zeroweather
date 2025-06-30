@@ -11,7 +11,7 @@ pub struct WeatherLogger {
 
 #[derive(Deserialize)]
 pub struct SensorW1 {
-    pub thermometer: (String, String),
+    pub thermometer: Vec<(String, String, usize)>,
 }
 
 #[derive(Deserialize)]
