@@ -1,10 +1,9 @@
 [package]
 name = "zeroweather"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 
 [dependencies]
-ureq ="3"
 toml = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 log4rs = "1.3"

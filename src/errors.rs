@@ -15,6 +15,12 @@ impl From<ConfigError> for UnrecoverableError {
         UnrecoverableError(e.to_string())
     }
 }
+impl From<std::io::Error> for UnrecoverableError {
+    fn from(e: std::io::Error) -> Self { UnrecoverableError(e.to_string()) }
+}
+impl From<core::net::AddrParseError> for UnrecoverableError {
+    fn from(e: core::net::AddrParseError) -> Self { UnrecoverableError(e.to_string()) }
+}
 
 /// Errors while managing configuration
 ///

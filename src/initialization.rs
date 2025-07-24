@@ -4,14 +4,18 @@ use serde::Deserialize;
 use crate::errors::ConfigError;
 use crate::logging::setup_logger;
 
+
 #[derive(Deserialize)]
-pub struct WeatherLogger {
-    pub url: String,
+pub struct WebServerParameters {
+    pub bind_address: String,
+    pub bind_port: u16,
 }
 
 #[derive(Deserialize)]
 pub struct SensorW1 {
-    pub thermometer: Vec<(String, String, usize, f64)>,
+    pub path: String,
+    pub ma_window: usize,
+    pub threshold: f64,
 }
 
 #[derive(Deserialize)]
@@ -23,7 +27,7 @@ pub struct General {
 
 #[derive(Deserialize)]
 pub struct Config {
-    pub weatherlogger: WeatherLogger,
+    pub web_server: WebServerParameters,
     pub sensor_w1: SensorW1,
     pub general: General,
 }
