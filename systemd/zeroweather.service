@@ -1,0 +1,16 @@
+[Unit]
+Description=Temperature logger for Rapberry Pi Zero 2 W
+After=network-online.target
+
+[Service]
+ExecStart=/bin/bash /home/petste/ZeroWeather/start.sh
+WorkingDirectory=/home/petste/ZeroWeather/
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+RestartSec=30
+User=petste
+
+[Install]
+WantedBy=multi-user.target
+
