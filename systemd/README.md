@@ -19,3 +19,6 @@ Output should be something like:
 
 Jul 25 12:09:48 zeroeast systemd[1]: Started zeroweather.service - Temperature logger for Rapberry Pi Zero 2 W.
 ```
+
+If the application for some reason prints anything to stdout/stderr, such in case of a panic,
+the log for that can be found by using `journalctl -u zeroweather.service`.
