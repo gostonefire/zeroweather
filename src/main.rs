@@ -61,5 +61,5 @@ fn main() -> Result<(), UnrecoverableError> {
 ///
 /// * 'data' - data to include in response
 fn http_response(data: f64) -> String {
-    format!("{}{{\"data:\" {}}}", HTTP_RESPONSE, data)
+    format!("{}{{\"data\": {}}}", HTTP_RESPONSE, data)
 }
