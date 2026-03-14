@@ -4,29 +4,54 @@ use crate::errors::ConfigError;
 use crate::logging::setup_logger;
 
 
+/// Configuration parameters for the web server
+///
+/// # Arguments
+///
+/// * 'bind_address' - the address for the web server to bind to
+/// * 'bind_port' - the port for the web server to bind to
 pub struct WebServerParameters {
     pub bind_address: String,
     pub bind_port: u16,
 }
 
+/// Configuration parameters for the 1-wire sensor
+///
+/// # Arguments
+///
+/// * 'path' - the path to the bus file carrying (and triggering) the measurement
+/// * 'ma_window' - moving average history (zero or one means no moving average)
+/// * 'threshold' - threshold before change in temperature is reported
 pub struct SensorW1 {
     pub path: String,
     pub ma_window: usize,
     pub threshold: f64,
 }
 
+/// General configuration parameters for the application
+///
+/// # Arguments
+///
+/// * 'log_path' - path to the log file
+/// * 'log_level' - logging level (Off, Error, Warn, Info, Debug, Trace)
+/// * 'log_to_stdout' - if true, logging is also written to stdout
 pub struct General {
     pub log_path: String,
     pub log_level: LevelFilter,
     pub log_to_stdout: bool,
 }
 
+/// The overall configuration for the application
+///
 pub struct Config {
     pub web_server: WebServerParameters,
     pub sensor_w1: SensorW1,
     pub general: General,
 }
 
+/// Struct used during the parsing of the configuration file
+///
+/// It holds optional values for all configuration items
 struct PartialConfig {
     web_server_bind_address: Option<String>,
     web_server_bind_port: Option<u16>,
@@ -39,6 +64,8 @@ struct PartialConfig {
 }
 
 impl PartialConfig {
+    /// Creates a new PartialConfig instance with all values set to None
+    ///
     fn new() -> Self {
         Self {
             web_server_bind_address: None,
@@ -52,6 +79,9 @@ impl PartialConfig {
         }
     }
 
+    /// Builds a Config struct from the PartialConfig instance
+    ///
+    /// Returns an error if any of the required configuration items are missing
     fn build(self) -> Result<Config, ConfigError> {
         Ok(Config {
             web_server: WebServerParameters {
@@ -71,12 +101,19 @@ impl PartialConfig {
         })
     }
 
+    /// Helper function to require an optional value and return an error if it's None
+    ///
+    /// # Arguments
+    ///
+    /// * 'value' - the optional value to check
+    /// * 'key' - the configuration key associated with the value
     fn require<T>(value: Option<T>, key: &str) -> Result<T, ConfigError> {
         value.ok_or_else(|| ConfigError::from(format!("missing config key: {}", key)))
     }
 }
 
 /// Returns a configuration struct for the application and starts logging
+///
 pub fn config() -> Result<Config, ConfigError> {
     let args: Vec<String> = env::args().collect();
     let config_path = args.iter()
@@ -99,11 +136,20 @@ pub fn config() -> Result<Config, ConfigError> {
 }
 
 /// Loads the configuration file and returns a struct with all configuration items
+///
+/// # Arguments
+///
+/// * 'config_path' - path to the configuration file
 fn load_config(config_path: &str) -> Result<Config, ConfigError> {
     let text = fs::read_to_string(config_path)?;
     parse_config(&text)
 }
 
+/// Parses the configuration text and returns a Config struct
+///
+/// # Arguments
+///
+/// * 'text' - the configuration text to parse
 fn parse_config(text: &str) -> Result<Config, ConfigError> {
     let mut partial = PartialConfig::new();
 
@@ -159,6 +205,13 @@ fn parse_config(text: &str) -> Result<Config, ConfigError> {
     partial.build()
 }
 
+/// Helper function to parse a value from a string
+///
+/// # Arguments
+///
+/// * 'value' - the string value to parse
+/// * 'key' - the configuration key associated with the value
+/// * 'line_number' - the line number in the configuration file
 fn parse_value<T>(value: &str, key: &str, line_number: usize) -> Result<T, ConfigError>
 where
     T: std::str::FromStr,
@@ -172,6 +225,12 @@ where
     })
 }
 
+/// Helper function to parse a log level from a string
+///
+/// # Arguments
+///
+/// * 'value' - the string value to parse
+/// * 'line_number' - the line number in the configuration file
 fn parse_log_level(value: &str, line_number: usize) -> Result<LevelFilter, ConfigError> {
     match value {
         "Off" => Ok(LevelFilter::Off),
