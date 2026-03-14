@@ -39,11 +39,6 @@ impl From<log::SetLoggerError> for ConfigError {
         ConfigError(e.to_string())
     }
 }
-impl From<log4rs::config::runtime::ConfigErrors> for ConfigError {
-    fn from(e: log4rs::config::runtime::ConfigErrors) -> Self {
-        ConfigError(e.to_string())
-    }
-}
 impl From<&str> for ConfigError {
     fn from(e: &str) -> Self { ConfigError(e.to_string()) }
 }

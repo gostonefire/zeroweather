@@ -1,10 +1,9 @@
 [package]
 name = "zeroweather"
-version = "0.3.2"
-edition = "2021"
+version = "0.3.3"
+edition = "2024"
 
 [dependencies]
-log4rs = "1.4"
 log = "0.4"
 
 [profile.release]
