@@ -1,39 +1,82 @@
 use std::{env, fs};
 use log::LevelFilter;
-use serde::Deserialize;
 use crate::errors::ConfigError;
 use crate::logging::setup_logger;
 
 
-#[derive(Deserialize)]
 pub struct WebServerParameters {
     pub bind_address: String,
     pub bind_port: u16,
 }
 
-#[derive(Deserialize)]
 pub struct SensorW1 {
     pub path: String,
     pub ma_window: usize,
     pub threshold: f64,
 }
 
-#[derive(Deserialize)]
 pub struct General {
     pub log_path: String,
     pub log_level: LevelFilter,
     pub log_to_stdout: bool,
 }
 
-#[derive(Deserialize)]
 pub struct Config {
     pub web_server: WebServerParameters,
     pub sensor_w1: SensorW1,
     pub general: General,
 }
 
+struct PartialConfig {
+    web_server_bind_address: Option<String>,
+    web_server_bind_port: Option<u16>,
+    sensor_w1_path: Option<String>,
+    sensor_w1_ma_window: Option<usize>,
+    sensor_w1_threshold: Option<f64>,
+    general_log_path: Option<String>,
+    general_log_level: Option<LevelFilter>,
+    general_log_to_stdout: Option<bool>,
+}
+
+impl PartialConfig {
+    fn new() -> Self {
+        Self {
+            web_server_bind_address: None,
+            web_server_bind_port: None,
+            sensor_w1_path: None,
+            sensor_w1_ma_window: None,
+            sensor_w1_threshold: None,
+            general_log_path: None,
+            general_log_level: None,
+            general_log_to_stdout: None,
+        }
+    }
+
+    fn build(self) -> Result<Config, ConfigError> {
+        Ok(Config {
+            web_server: WebServerParameters {
+                bind_address: Self::require(self.web_server_bind_address, "web_server.bind_address")?,
+                bind_port: Self::require(self.web_server_bind_port, "web_server.bind_port")?,
+            },
+            sensor_w1: SensorW1 {
+                path: Self::require(self.sensor_w1_path, "sensor_w1.path")?,
+                ma_window: Self::require(self.sensor_w1_ma_window, "sensor_w1.ma_window")?,
+                threshold: Self::require(self.sensor_w1_threshold, "sensor_w1.threshold")?,
+            },
+            general: General {
+                log_path: Self::require(self.general_log_path, "general.log_path")?,
+                log_level: Self::require(self.general_log_level, "general.log_level")?,
+                log_to_stdout: Self::require(self.general_log_to_stdout, "general.log_to_stdout")?,
+            },
+        })
+    }
+
+    fn require<T>(value: Option<T>, key: &str) -> Result<T, ConfigError> {
+        value.ok_or_else(|| ConfigError::from(format!("missing config key: {}", key)))
+    }
+}
+
 /// Returns a configuration struct for the application and starts logging
-///
 pub fn config() -> Result<Config, ConfigError> {
     let args: Vec<String> = env::args().collect();
     let config_path = args.iter()
@@ -44,22 +87,102 @@ pub fn config() -> Result<Config, ConfigError> {
         .ok_or(ConfigError::from("invalid --config=<config_path>"))?
         .1;
 
-    let config = load_config(&config_path)?;
+    let config = load_config(config_path)?;
 
-    setup_logger(&config.general.log_path, config.general.log_level, config.general.log_to_stdout)?;
+    setup_logger(
+        &config.general.log_path,
+        config.general.log_level,
+        config.general.log_to_stdout,
+    )?;
 
     Ok(config)
 }
 
 /// Loads the configuration file and returns a struct with all configuration items
-///
-/// # Arguments
-///
-/// * 'config_path' - path to the config file
 fn load_config(config_path: &str) -> Result<Config, ConfigError> {
+    let text = fs::read_to_string(config_path)?;
+    parse_config(&text)
+}
 
-    let toml = fs::read_to_string(config_path)?;
-    let config: Config = toml::from_str(&toml)?;
+fn parse_config(text: &str) -> Result<Config, ConfigError> {
+    let mut partial = PartialConfig::new();
 
-    Ok(config)
+    for (index, raw_line) in text.lines().enumerate() {
+        let line_number = index + 1;
+        let line = raw_line.trim();
+
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+
+        let (key, value) = line
+            .split_once('=')
+            .ok_or_else(|| ConfigError::from(format!("line {}: expected key=value", line_number)))?;
+
+        let key = key.trim();
+        let value = value.trim();
+
+        match key {
+            "web_server.bind_address" => {
+                partial.web_server_bind_address = Some(value.to_string());
+            }
+            "web_server.bind_port" => {
+                partial.web_server_bind_port = Some(parse_value(value, key, line_number)?);
+            }
+            "sensor_w1.path" => {
+                partial.sensor_w1_path = Some(value.to_string());
+            }
+            "sensor_w1.ma_window" => {
+                partial.sensor_w1_ma_window = Some(parse_value(value, key, line_number)?);
+            }
+            "sensor_w1.threshold" => {
+                partial.sensor_w1_threshold = Some(parse_value(value, key, line_number)?);
+            }
+            "general.log_path" => {
+                partial.general_log_path = Some(value.to_string());
+            }
+            "general.log_level" => {
+                partial.general_log_level = Some(parse_log_level(value, line_number)?);
+            }
+            "general.log_to_stdout" => {
+                partial.general_log_to_stdout = Some(parse_value(value, key, line_number)?);
+            }
+            _ => {
+                return Err(ConfigError::from(format!(
+                    "line {}: unknown config key: {}",
+                    line_number, key
+                )));
+            }
+        }
+    }
+
+    partial.build()
+}
+
+fn parse_value<T>(value: &str, key: &str, line_number: usize) -> Result<T, ConfigError>
+where
+    T: std::str::FromStr,
+    T::Err: std::fmt::Display,
+{
+    value.parse::<T>().map_err(|e| {
+        ConfigError::from(format!(
+            "line {}: invalid value for {}: {}",
+            line_number, key, e
+        ))
+    })
+}
+
+fn parse_log_level(value: &str, line_number: usize) -> Result<LevelFilter, ConfigError> {
+    match value {
+        "Off" => Ok(LevelFilter::Off),
+        "Error" => Ok(LevelFilter::Error),
+        "Warn" => Ok(LevelFilter::Warn),
+        "Info" => Ok(LevelFilter::Info),
+        "Debug" => Ok(LevelFilter::Debug),
+        "Trace" => Ok(LevelFilter::Trace),
+        _ => Err(ConfigError::from(format!(
+            "line {}: invalid value for general.log_level: {}",
+            line_number, value
+        ))),
+    }
 }

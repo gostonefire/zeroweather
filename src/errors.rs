@@ -47,8 +47,6 @@ impl From<log4rs::config::runtime::ConfigErrors> for ConfigError {
 impl From<&str> for ConfigError {
     fn from(e: &str) -> Self { ConfigError(e.to_string()) }
 }
-impl From<toml::de::Error> for ConfigError {
-    fn from(e: toml::de::Error) -> Self {
-        ConfigError(e.to_string())
-    }
+impl From<String> for ConfigError {
+    fn from(e: String) -> Self { ConfigError(e) }
 }
